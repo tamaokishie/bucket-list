@@ -144,7 +144,7 @@ export default function BucketSection({
                 <input
                   ref={inputRef}
                   value={draft}
-                  placeholder="新しいタスク"
+                  placeholder="Add a task"
                   onChange={(event) => setDraft(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
