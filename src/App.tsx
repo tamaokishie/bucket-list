@@ -1,15 +1,26 @@
-import { useMemo, useRef, useState } from "react";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import Button from "@mui/material/Button";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import BucketItem from "./BucketItem";
+import type { BucketItemData, BucketStatus } from "./BucketItem";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import "./App.css";
-
-type BucketStatus = "done" | "soon" | "want";
-
-type BucketItem = {
-  id: number;
-  text: string;
-  status: BucketStatus;
-};
 
 type StatusMeta = {
   label: string;
@@ -45,7 +56,7 @@ const STATUS_META: Record<BucketStatus, StatusMeta> = {
   },
 };
 
-const INITIAL_ITEMS: BucketItem[] = [
+const INITIAL_ITEMS: BucketItemData[] = [
   { id: 1, text: "ファンデ買う", status: "done" },
   { id: 2, text: "資格の勉強を終える", status: "done" },
   { id: 3, text: "部屋を片付ける", status: "done" },
@@ -56,23 +67,55 @@ const INITIAL_ITEMS: BucketItem[] = [
   { id: 8, text: "スカイダイビングする", status: "want" },
 ];
 
-const ITEM_SELECTOR = ".bucket-item-wrapper";
-const SECTION_SELECTOR = ".bucket-section";
+const isBucketStatus = (value: unknown): value is BucketStatus =>
+  value === "done" || value === "soon" || value === "want";
 
-function getDropEffect(event: React.DragEvent) {
-  event.preventDefault();
+type EmptyDropZoneProps = {
+  status: BucketStatus;
+};
 
-  try {
-    event.dataTransfer.dropEffect = "move";
-  } catch {
-    // Some browsers expose a read-only dataTransfer object.
-  }
+function EmptyDropZone({ status }: EmptyDropZoneProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `empty-${status}`,
+    data: {
+      type: "empty-section",
+      status,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`bucket-section__empty-drop${
+        isOver ? " bucket-section__empty-drop--over" : ""
+      }`}
+    >
+      ここに追加
+    </div>
+  );
 }
 
 function App() {
-  const [items, setItems] = useState<BucketItem[]>(INITIAL_ITEMS);
+  const [items, setItems] = useState<BucketItemData[]>(INITIAL_ITEMS);
   const [draft, setDraft] = useState("");
-  const draggedIdRef = useRef<number | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<BucketStatus, boolean>>({
+    done: false,
+    soon: false,
+    want: false,
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 8,
+      },
+    }),
+  );
 
   const sections = useMemo(
     () =>
@@ -84,34 +127,16 @@ function App() {
     [items],
   );
 
-  const moveItem = (
-    itemId: number,
-    nextStatus: BucketStatus,
-    targetId?: number,
-  ) => {
-    setItems((current) => {
-      const source = current.find((item) => item.id === itemId);
-      if (!source) return current;
+  const activeItem = useMemo(
+    () => items.find((item) => item.id === activeId) ?? null,
+    [activeId, items],
+  );
 
-      const movedItem = { ...source, status: nextStatus };
-      const remainingItems = current.filter((item) => item.id !== itemId);
-
-      if (targetId === undefined) {
-        return [...remainingItems, movedItem];
-      }
-
-      const targetIndex = remainingItems.findIndex(
-        (item) => item.id === targetId,
-      );
-
-      if (targetIndex === -1) {
-        return [...remainingItems, movedItem];
-      }
-
-      const nextItems = [...remainingItems];
-      nextItems.splice(targetIndex, 0, movedItem);
-      return nextItems;
-    });
+  const toggleSection = (status: BucketStatus) => {
+    setCollapsed((current) => ({
+      ...current,
+      [status]: !current[status],
+    }));
   };
 
   const addItem = () => {
@@ -126,6 +151,7 @@ function App() {
         status: "want",
       },
     ]);
+
     setDraft("");
   };
 
@@ -133,227 +159,172 @@ function App() {
     setItems((current) => current.filter((item) => item.id !== itemId));
   };
 
-  const clearDraggedItem = () => {
-    draggedIdRef.current = null;
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    if (typeof active.id === "number") {
+      setActiveId(active.id);
+    }
   };
 
-  const getDraggedId = (dataTransfer?: DataTransfer | null) => {
-    try {
-      const transferredId = Number(dataTransfer?.getData("text/plain"));
-      if (Number.isSafeInteger(transferredId) && transferredId > 0) {
-        return transferredId;
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveId(null);
+
+    if (!over || typeof active.id !== "number") return;
+
+    setItems((current) => {
+      const activeIndex = current.findIndex((item) => item.id === active.id);
+      if (activeIndex === -1) return current;
+
+      const draggedItem = current[activeIndex];
+      const overData = over.data.current;
+
+      if (
+        overData?.type === "empty-section" &&
+        isBucketStatus(overData.status)
+      ) {
+        const withoutDragged = current.filter((item) => item.id !== active.id);
+
+        return [
+          ...withoutDragged,
+          {
+            ...draggedItem,
+            status: overData.status,
+          },
+        ];
       }
-    } catch {
-      // Fall back to the ref when dataTransfer is unavailable.
-    }
 
-    return draggedIdRef.current;
+      if (typeof over.id !== "number") return current;
+
+      const overIndex = current.findIndex((item) => item.id === over.id);
+      if (overIndex === -1) return current;
+
+      const targetItem = current[overIndex];
+      const next = [...current];
+
+      next[activeIndex] = {
+        ...draggedItem,
+        status: targetItem.status,
+      };
+
+      return arrayMove(next, activeIndex, overIndex);
+    });
   };
-
-  const dropAtPoint = (x: number, y: number) => {
-    const draggedId = draggedIdRef.current;
-    if (draggedId === null) return;
-
-    const element = document.elementFromPoint(x, y) as HTMLElement | null;
-    if (!element) return;
-
-    const itemElement = element.closest(ITEM_SELECTOR) as HTMLElement | null;
-    if (itemElement) {
-      const targetId = Number(itemElement.dataset.itemId);
-      if (!Number.isSafeInteger(targetId) || targetId === draggedId) return;
-
-      const targetItem = items.find((item) => item.id === targetId);
-      if (targetItem) {
-        moveItem(draggedId, targetItem.status, targetId);
-      }
-      return;
-    }
-
-    const sectionElement = element.closest(
-      SECTION_SELECTOR,
-    ) as HTMLElement | null;
-    const status = sectionElement?.dataset.status as BucketStatus | undefined;
-
-    if (status && STATUS_ORDER.includes(status)) {
-      moveItem(draggedId, status);
-    }
-  };
-
-  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
-    const touch = event.changedTouches[0];
-    dropAtPoint(touch.clientX, touch.clientY);
-    clearDraggedItem();
-  };
-
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === "mouse") return;
-
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // Pointer may already have been released.
-    }
-
-    dropAtPoint(event.clientX, event.clientY);
-    clearDraggedItem();
-  };
-
-  const handleSectionDrop = (
-    event: React.DragEvent<HTMLElement>,
-    status: BucketStatus,
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const draggedId = getDraggedId(event.dataTransfer);
-    if (draggedId !== null) {
-      moveItem(draggedId, status);
-    }
-
-    clearDraggedItem();
-  };
-
-  const handleItemDrop = (
-    event: React.DragEvent<HTMLDivElement>,
-    targetItem: BucketItem,
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const draggedId = getDraggedId(event.dataTransfer);
-    if (draggedId !== null && draggedId !== targetItem.id) {
-      moveItem(draggedId, targetItem.status, targetItem.id);
-    }
-
-    clearDraggedItem();
-  };
-
-  const renderItem = (item: BucketItem) => (
-    <div
-      key={item.id}
-      className="bucket-item-wrapper"
-      data-item-id={item.id}
-      draggable
-      onTouchStart={(event) => {
-        event.stopPropagation();
-        draggedIdRef.current = item.id;
-      }}
-      onTouchEnd={handleTouchEnd}
-      onPointerDown={(event) => {
-        if (event.pointerType === "mouse") return;
-
-        try {
-          event.currentTarget.setPointerCapture(event.pointerId);
-        } catch {
-          // Pointer capture is not supported by every browser/device.
-        }
-
-        event.stopPropagation();
-        draggedIdRef.current = item.id;
-      }}
-      onPointerUp={handlePointerUp}
-      onDragStart={(event) => {
-        try {
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", String(item.id));
-        } catch {
-          // Fall back to draggedIdRef.
-        }
-
-        draggedIdRef.current = item.id;
-      }}
-      onDragEnd={clearDraggedItem}
-      onDragOver={getDropEffect}
-      onDrop={(event) => handleItemDrop(event, item)}
-    >
-      <div className={`bucket-item bucket-item--${item.status}`}>
-        <span className="bucket-item__handle" aria-label="ドラッグして並び替え">
-          ⋮⋮
-        </span>
-
-        <span
-          className={`bucket-item__marker bucket-item__marker--${item.status}`}
-        >
-          {STATUS_META[item.status].marker}
-        </span>
-
-        <span className="bucket-item__text">{item.text}</span>
-
-        <button
-          type="button"
-          className="bucket-item__delete"
-          aria-label={`${item.text}を削除`}
-          onClick={() => deleteItem(item.id)}
-        >
-          <DeleteOutlineIcon fontSize="small" />
-        </button>
-      </div>
-    </div>
-  );
 
   return (
-    <div className="app-shell">
-      <div className="app-layout">
-        <main className="list-panel">
-          <div className="board-columns">
-            {sections.map(({ status, meta, items: sectionItems }) => (
-              <section
-                key={status}
-                className="bucket-section"
-                data-status={status}
-                style={
-                  {
-                    "--section-accent": meta.accent,
-                    "--section-bg": meta.background,
-                    "--section-border": meta.border,
-                  } as React.CSSProperties
-                }
-                onDragOver={getDropEffect}
-                onDrop={(event) => handleSectionDrop(event, status)}
-              >
-                <div className="bucket-section__header">{meta.label}</div>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragCancel={() => setActiveId(null)}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="app-shell">
+        <div className="app-layout">
+          <main className="list-panel">
+            <div className="board-columns">
+              {sections.map(({ status, meta, items: sectionItems }) => (
+                <section
+                  key={status}
+                  className="bucket-section"
+                  style={
+                    {
+                      "--section-accent": meta.accent,
+                      "--section-bg": meta.background,
+                      "--section-border": meta.border,
+                    } as CSSProperties
+                  }
+                >
+                  <button
+                    type="button"
+                    className="bucket-section__header"
+                    onClick={() => toggleSection(status)}
+                    aria-expanded={!collapsed[status]}
+                    aria-controls={`bucket-list-${status}`}
+                  >
+                    <span>{meta.label}</span>
+                    <ExpandMoreIcon
+                      className={`bucket-section__chevron${
+                        collapsed[status]
+                          ? " bucket-section__chevron--collapsed"
+                          : ""
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
 
-                <div className="bucket-section__list">
-                  {sectionItems.length > 0 ? (
-                    sectionItems.map(renderItem)
-                  ) : (
-                    <div className="bucket-section__empty">ここに入れます</div>
+                  {!collapsed[status] && (
+                    <SortableContext
+                      items={sectionItems.map((item) => item.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div
+                        id={`bucket-list-${status}`}
+                        className="bucket-section__list"
+                      >
+                        {sectionItems.map((item) => (
+                          <BucketItem
+                            key={item.id}
+                            item={item}
+                            marker={STATUS_META[item.status].marker}
+                            onDelete={deleteItem}
+                          />
+                        ))}
+
+                        {sectionItems.length === 0 && (
+                          <EmptyDropZone status={status} />
+                        )}
+                      </div>
+                    </SortableContext>
                   )}
-                </div>
-              </section>
-            ))}
-          </div>
+                </section>
+              ))}
+            </div>
 
-          <div className="add-item-row">
-            <input
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") addItem();
-              }}
-              placeholder="Add a new task"
-              aria-label="Add a new task"
-            />
+            <div className="add-item-row">
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") addItem();
+                }}
+                placeholder="Add a new task"
+                aria-label="Add a new task"
+              />
 
-            <Button
-              variant="contained"
-              size="small"
-              sx={{
-                backgroundColor: "#b0b7bd",
-                color: "#ffffff",
-                textTransform: "none",
-                "&:hover": {
-                  backgroundColor: "#9ca3a9",
-                },
-              }}
-              onClick={addItem}
-            >
-              Add
-            </Button>
-          </div>
-        </main>
+              <Button
+                variant="contained"
+                size="small"
+                sx={{
+                  backgroundColor: "#b0b7bd",
+                  color: "#ffffff",
+                  textTransform: "none",
+                  "&:hover": {
+                    backgroundColor: "#9ca3a9",
+                  },
+                }}
+                onClick={addItem}
+              >
+                Add
+              </Button>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+
+      <DragOverlay
+        dropAnimation={{
+          duration: 180,
+          easing: "ease-out",
+        }}
+      >
+        {activeItem ? (
+          <BucketItem
+            item={activeItem}
+            marker={STATUS_META[activeItem.status].marker}
+            overlay
+          />
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 
