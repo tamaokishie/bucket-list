@@ -291,41 +291,71 @@ input {
 /* Mobile */
 @media (max-width: 640px) {
   .app-shell {
-    padding: 10px;
+    padding: 8px;
   }
 
   .board-columns {
-    padding-left: 0;
-    padding-right: 0;
+    gap: 8px;
+  }
+
+  .bucket-section__header {
+    min-height: 36px;
+    padding: 0 6px;
   }
 
   .bucket-section__toggle {
-    font-size: 1rem;
+    font-size: 0.92rem;
+    gap: 2px;
+  }
+
+  .bucket-section__chevron {
+    font-size: 1.05rem !important;
+  }
+
+  .bucket-section__add {
+    padding: 4px !important;
+  }
+
+  .bucket-section__add svg {
+    font-size: 1.2rem;
   }
 
   .bucket-item {
-    min-height: 42px;
-    padding: 0 10px;
-    gap: 7px;
+    min-height: 38px;
+    padding: 0 8px;
+    gap: 6px;
   }
 
-  .bucket-item__text {
-    font-size: 0.9rem;
-  }
-
-  .bucket-item__marker {
-    width: 26px;
-    height: 26px;
+  .bucket-item__handle {
+    width: 14px;
     font-size: 0.8rem;
   }
 
-  .bucket-item__delete {
-    width: 30px;
-    height: 30px;
+  .bucket-item__marker {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    font-size: 0.75rem;
   }
 
-  .bucket-add-row input {
-    font-size: 16px;
+  .bucket-item__text {
+    font-size: 0.86rem;
+  }
+
+  .bucket-item__delete {
+    width: 27px;
+    height: 27px;
+  }
+
+  .bucket-item__delete svg {
+    font-size: 1.1rem;
+  }
+
+  .bucket-add-row {
+    min-height: 38px;
+    height: 38px;
+    padding: 0 8px;
+    gap: 6px;
   }
 }
 
