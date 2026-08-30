@@ -1,0 +1,221 @@
+:root {
+  --page-bg: #dfeef5;
+  --line: #dfe5e8;
+  --text: #1a1f24;
+  --green: #53b86a;
+  --pink: #c95ca7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: var(--page-bg);
+  color: var(--text);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--page-bg);
+}
+
+.app-layout {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-start;
+}
+
+.list-panel {
+  flex: 1;
+  padding: 0;
+}
+
+.board-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 14px 8px;
+}
+
+.bucket-section {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.bucket-section__header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  background: var(--section-bg);
+  color: #1c2b1d;
+}
+
+.bucket-section__list {
+  display: flex;
+  flex-direction: column;
+  min-height: 48px;
+}
+
+.bucket-item-wrapper {
+  position: relative;
+}
+
+.bucket-item {
+  position: relative;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(18, 36, 41, 0.08);
+  background: #ffffff;
+  cursor: grab;
+  user-select: none;
+}
+
+.bucket-item:active {
+  cursor: grabbing;
+}
+
+.bucket-item__handle {
+  width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #7c8a90;
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: -0.08em;
+  opacity: 0.9;
+  cursor: grab;
+  user-select: none;
+}
+
+.bucket-item__handle:active {
+  cursor: grabbing;
+}
+
+.bucket-item__marker {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.bucket-item__delete {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(170, 180, 188, 0.12);
+  color: #7c8a90;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.bucket-item__delete:hover {
+  background: rgba(120, 130, 138, 0.14);
+  color: #6b737a;
+}
+
+.bucket-item__marker--done {
+  background: var(--green);
+}
+
+.bucket-item__marker--soon {
+  background: var(--pink);
+}
+
+.bucket-item__marker--want {
+  background: #b8b9bd;
+}
+
+.bucket-item__text {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #222a2d;
+}
+
+.bucket-section__empty {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: #7a7f83;
+  font-size: 1rem;
+}
+
+.add-item-row {
+  margin: 10px 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px 10px;
+}
+
+.add-item-row input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.1rem;
+  outline: none;
+}
+
+.add-item-row input::placeholder {
+  color: #7a8a90;
+}
+
+.add-item-row__submit {
+  border: 1px solid #bfc8ce;
+  background: #ecf2f4;
+  color: #2f3d46;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 12px;
+  }
+
+  .board-columns,
+  .add-item-row {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
