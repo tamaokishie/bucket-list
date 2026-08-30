@@ -291,7 +291,7 @@ input {
 /* Mobile */
 @media (max-width: 640px) {
   .app-shell {
-    padding: 8px;
+    padding: 4px;
   }
 
   .board-columns {
