@@ -1,25 +1,21 @@
 import { useMemo, useState } from "react";
-import type { CSSProperties } from "react";
-import Button from "@mui/material/Button";
+
 import {
   DndContext,
   DragOverlay,
   MouseSensor,
   TouchSensor,
   closestCenter,
-  useDroppable,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { arrayMove } from "@dnd-kit/sortable";
+
 import BucketItem from "./BucketItem";
+import BucketSection from "./BucketSection";
 import type { BucketItemData, BucketStatus } from "./BucketItem";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+
 import "./App.css";
 
 type StatusMeta = {
@@ -49,7 +45,7 @@ const STATUS_META: Record<BucketStatus, StatusMeta> = {
   },
   want: {
     label: "To Do",
-    accent: "#d7d7d7",
+    accent: "#9ca3a9",
     background: "#f5f5f5",
     border: "#d9d9d9",
     marker: "•",
@@ -70,34 +66,8 @@ const INITIAL_ITEMS: BucketItemData[] = [
 const isBucketStatus = (value: unknown): value is BucketStatus =>
   value === "done" || value === "soon" || value === "want";
 
-type EmptyDropZoneProps = {
-  status: BucketStatus;
-};
-
-function EmptyDropZone({ status }: EmptyDropZoneProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `empty-${status}`,
-    data: {
-      type: "empty-section",
-      status,
-    },
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`bucket-section__empty-drop${
-        isOver ? " bucket-section__empty-drop--over" : ""
-      }`}
-    >
-      ここに追加
-    </div>
-  );
-}
-
-function App() {
+export default function App() {
   const [items, setItems] = useState<BucketItemData[]>(INITIAL_ITEMS);
-  const [draft, setDraft] = useState("");
   const [activeId, setActiveId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Record<BucketStatus, boolean>>({
     done: false,
@@ -106,19 +76,16 @@ function App() {
   });
 
   const sensors = useSensors(
-  useSensor(MouseSensor, {
-    activationConstraint: {
-      distance: 5,
-    },
-  }),
-
-  useSensor(TouchSensor, {
-    activationConstraint: {
-      delay: 200,
-      tolerance: 6,
-    },
-  }),
-);
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 6,
+      },
+    }),
+  );
 
   const sections = useMemo(
     () =>
@@ -142,20 +109,24 @@ function App() {
     }));
   };
 
-  const addItem = () => {
-    const text = draft.trim();
-    if (!text) return;
-
-    setItems((current) => [
-      ...current,
-      {
+  const addItem = (status: BucketStatus, text: string) => {
+    setItems((current) => {
+      const newItem: BucketItemData = {
         id: Date.now(),
         text,
-        status: "want",
-      },
-    ]);
+        status,
+      };
 
-    setDraft("");
+      const firstIndex = current.findIndex((item) => item.status === status);
+
+      if (firstIndex === -1) {
+        return [...current, newItem];
+      }
+
+      const next = [...current];
+      next.splice(firstIndex, 0, newItem);
+      return next;
+    });
   };
 
   const deleteItem = (itemId: number) => {
@@ -169,13 +140,17 @@ function App() {
   };
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    setActiveId(null);
-
-    if (!over || typeof active.id !== "number") return;
+    if (!over || typeof active.id !== "number") {
+      setActiveId(null);
+      return;
+    }
 
     setItems((current) => {
       const activeIndex = current.findIndex((item) => item.id === active.id);
-      if (activeIndex === -1) return current;
+
+      if (activeIndex === -1) {
+        return current;
+      }
 
       const draggedItem = current[activeIndex];
       const overData = over.data.current;
@@ -184,7 +159,9 @@ function App() {
         overData?.type === "empty-section" &&
         isBucketStatus(overData.status)
       ) {
-        const withoutDragged = current.filter((item) => item.id !== active.id);
+        const withoutDragged = current.filter(
+          (item) => item.id !== active.id,
+        );
 
         return [
           ...withoutDragged,
@@ -195,10 +172,15 @@ function App() {
         ];
       }
 
-      if (typeof over.id !== "number") return current;
+      if (typeof over.id !== "number") {
+        return current;
+      }
 
       const overIndex = current.findIndex((item) => item.id === over.id);
-      if (overIndex === -1) return current;
+
+      if (overIndex === -1) {
+        return current;
+      }
 
       const targetItem = current[overIndex];
       const next = [...current];
@@ -210,6 +192,8 @@ function App() {
 
       return arrayMove(next, activeIndex, overIndex);
     });
+
+    setActiveId(null);
   };
 
   return (
@@ -225,89 +209,17 @@ function App() {
           <main className="list-panel">
             <div className="board-columns">
               {sections.map(({ status, meta, items: sectionItems }) => (
-                <section
+                <BucketSection
                   key={status}
-                  className="bucket-section"
-                  style={
-                    {
-                      "--section-accent": meta.accent,
-                      "--section-bg": meta.background,
-                      "--section-border": meta.border,
-                    } as CSSProperties
-                  }
-                >
-                  <button
-                    type="button"
-                    className="bucket-section__header"
-                    onClick={() => toggleSection(status)}
-                    aria-expanded={!collapsed[status]}
-                    aria-controls={`bucket-list-${status}`}
-                  >
-                    <span>{meta.label}</span>
-                    <ExpandMoreIcon
-                      className={`bucket-section__chevron${
-                        collapsed[status]
-                          ? " bucket-section__chevron--collapsed"
-                          : ""
-                      }`}
-                      aria-hidden="true"
-                    />
-                  </button>
-
-                  {!collapsed[status] && (
-                    <SortableContext
-                      items={sectionItems.map((item) => item.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <div
-                        id={`bucket-list-${status}`}
-                        className="bucket-section__list"
-                      >
-                        {sectionItems.map((item) => (
-                          <BucketItem
-                            key={item.id}
-                            item={item}
-                            marker={STATUS_META[item.status].marker}
-                            onDelete={deleteItem}
-                          />
-                        ))}
-
-                        {sectionItems.length === 0 && (
-                          <EmptyDropZone status={status} />
-                        )}
-                      </div>
-                    </SortableContext>
-                  )}
-                </section>
+                  status={status}
+                  meta={meta}
+                  items={sectionItems}
+                  collapsed={collapsed[status]}
+                  onToggle={() => toggleSection(status)}
+                  onAdd={addItem}
+                  onDelete={deleteItem}
+                />
               ))}
-            </div>
-
-            <div className="add-item-row">
-              <input
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") addItem();
-                }}
-                placeholder="Add a new task"
-                aria-label="Add a new task"
-              />
-
-              <Button
-                variant="contained"
-                size="small"
-                sx={{
-                  backgroundColor: "#b0b7bd",
-                  color: "#ffffff",
-                  textTransform: "none",
-                  "&:hover": {
-                    backgroundColor: "#9ca3a9",
-                  },
-                }}
-                onClick={addItem}
-              >
-                Add
-              </Button>
             </div>
           </main>
         </div>
@@ -325,5 +237,3 @@ function App() {
     </DndContext>
   );
 }
-
-export default App;

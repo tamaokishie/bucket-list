@@ -1,6 +1,5 @@
 :root {
   --page-bg: #dfeef5;
-  --line: #dfe5e8;
   --text: #1a1f24;
   --green: #53b86a;
   --pink: #c95ca7;
@@ -30,6 +29,7 @@ input {
   font: inherit;
 }
 
+/* Layout */
 .app-shell {
   min-height: 100vh;
   padding: 16px;
@@ -45,7 +45,6 @@ input {
 
 .list-panel {
   flex: 1;
-  padding: 0;
 }
 
 .board-columns {
@@ -55,21 +54,60 @@ input {
   padding: 0 14px 8px;
 }
 
+/* Section */
 .bucket-section {
-  border-radius: 8px;
   overflow: hidden;
-  background: #ffffff;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .bucket-section__header {
+  width: 100%;
   min-height: 40px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 8px;
+  background: var(--section-bg);
+}
+
+.bucket-section__toggle {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #1c2b1d;
   font-size: 1.1rem;
   font-weight: 700;
-  background: var(--section-bg);
-  color: #1c2b1d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bucket-section__toggle:focus-visible {
+  outline: 2px solid var(--section-accent);
+  outline-offset: -2px;
+}
+
+.bucket-section__chevron {
+  flex-shrink: 0;
+  color: #718087;
+  font-size: 1.25rem !important;
+  transform: rotate(0deg);
+  transition: transform 140ms ease;
+}
+
+.bucket-section__chevron--collapsed {
+  transform: rotate(-90deg);
+}
+
+.bucket-section__add {
+  flex-shrink: 0;
+  color: #718087 !important;
 }
 
 .bucket-section__list {
@@ -78,6 +116,7 @@ input {
   min-height: 0;
 }
 
+/* Item */
 .bucket-item-wrapper {
   position: relative;
   user-select: none;
@@ -92,7 +131,7 @@ input {
   gap: 10px;
   padding: 0 16px;
   border-bottom: 1px solid rgba(18, 36, 41, 0.08);
-  background: #ffffff;
+  background: #fff;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -122,40 +161,17 @@ input {
   -webkit-user-select: none;
 }
 
-.bucket-item__handle:active {
-  cursor: grabbing;
-}
-
 .bucket-item__marker {
   width: 24px;
   height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   border-radius: 6px;
+  color: #fff;
   font-size: 0.9rem;
   font-weight: 700;
-  color: white;
-  flex-shrink: 0;
-}
-
-.bucket-item__delete {
-  margin-left: auto;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(170, 180, 188, 0.12);
-  color: #7c8a90;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.bucket-item__delete:hover {
-  background: rgba(120, 130, 138, 0.14);
-  color: #6b737a;
 }
 
 .bucket-item__marker--done {
@@ -172,29 +188,38 @@ input {
 
 .bucket-item__text {
   min-width: 0;
+  color: #222a2d;
   font-size: 1.1rem;
   font-weight: 500;
-  color: #222a2d;
 }
 
-.bucket-section__empty {
-  min-height: 48px;
-  display: flex;
+.bucket-item__delete {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  display: inline-flex;
   align-items: center;
-  padding: 0 16px;
-  color: #7a7f83;
-  font-size: 1rem;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(170, 180, 188, 0.12);
+  color: #7c8a90;
+  cursor: pointer;
 }
 
-/* dnd-kit: 元のカード */
+.bucket-item__delete:hover {
+  background: rgba(120, 130, 138, 0.14);
+  color: #6b737a;
+}
+
+/* Drag */
 .bucket-item-wrapper--dragging {
   opacity: 0.28;
 }
 
-/* dnd-kit: 指についてくる浮いたカード */
 .bucket-item-wrapper--overlay {
-  cursor: grabbing;
   pointer-events: none;
+  cursor: grabbing;
   transform: scale(1.035) rotate(0.35deg);
 }
 
@@ -207,58 +232,18 @@ input {
   cursor: grabbing;
 }
 
-.add-item-row {
-  margin: 10px 14px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 8px 10px;
-}
-
-.add-item-row input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 1.1rem;
-  outline: none;
-}
-
-.add-item-row input::placeholder {
-  color: #7a8a90;
-}
-
-.add-item-row__submit {
-  border: 1px solid #bfc8ce;
-  background: #ecf2f4;
-  color: #2f3d46;
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bucket-item,
-  .bucket-section__drop-target {
-    transition: none;
-  }
-}
-
-/* 空リスト専用のドロップ領域 */
+/* Empty drop area */
 .bucket-section__empty-drop {
   min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 8px;
+  margin: 5px 8px;
   border: 1px dashed #c9d1d5;
   border-radius: 7px;
+  background: rgba(255, 255, 255, 0.55);
   color: #8a9499;
   font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.55);
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
@@ -271,43 +256,53 @@ input {
   color: var(--section-accent);
 }
 
-/* 折りたたみ可能なセクションヘッダー */
-.bucket-section__header {
-  width: 100%;
-  border: none;
-  cursor: pointer;
-  justify-content: space-between;
-  text-align: left;
+/* Inline add row */
+.bucket-add-row {
+  height: 42px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(18, 36, 41, 0.08);
+  background: #fff;
 }
 
-.bucket-section__header:hover {
-  filter: brightness(0.985);
+.bucket-add-row input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
 }
 
-.bucket-section__header:focus-visible {
-  outline: 2px solid var(--section-accent);
-  outline-offset: -2px;
+.bucket-add-row input::placeholder {
+  color: #9aa3a8;
 }
 
-.bucket-section__chevron {
-  margin-left: auto;
-  font-size: 1.15rem;
-  line-height: 1;
-  transform: rotate(0deg);
-  transition: transform 140ms ease;
+.bucket-add-row .MuiIconButton-root {
+  width: 30px;
+  height: 30px;
+  color: #7c8a90;
 }
 
-.bucket-section__chevron--collapsed {
-  transform: rotate(-90deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bucket-section__chevron {
-    transition: none;
-  }
-}
-
+/* Mobile */
 @media (max-width: 640px) {
+  .app-shell {
+    padding: 10px;
+  }
+
+  .board-columns {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .bucket-section__toggle {
+    font-size: 1rem;
+  }
+
   .bucket-item {
     min-height: 42px;
     padding: 0 10px;
@@ -329,8 +324,15 @@ input {
     height: 30px;
   }
 
-  .bucket-section__header {
-    min-height: 40px;
-    font-size: 1rem;
+  .bucket-add-row input {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bucket-item,
+  .bucket-section__empty-drop,
+  .bucket-section__chevron {
+    transition: none;
   }
 }
