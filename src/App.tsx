@@ -107,12 +107,14 @@ function App() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 6 },
+      activationConstraint: {
+        distance: 8,
+      },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250,
-        tolerance: 8,
+        delay: 300,
+        tolerance: 10,
       },
     }),
   );
@@ -310,12 +312,7 @@ function App() {
         </div>
       </div>
 
-      <DragOverlay
-        dropAnimation={{
-          duration: 180,
-          easing: "ease-out",
-        }}
-      >
+      <DragOverlay dropAnimation={null}>
         {activeItem ? (
           <BucketItem
             item={activeItem}
