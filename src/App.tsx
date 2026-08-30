@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import Button from "@mui/material/Button";
 import "./App.css";
@@ -11,31 +11,41 @@ type BucketItem = {
   status: BucketStatus;
 };
 
-const statusMeta: Record<
-  BucketStatus,
-  { label: string; accent: string; background: string; border: string }
-> = {
+type StatusMeta = {
+  label: string;
+  accent: string;
+  background: string;
+  border: string;
+  marker: string;
+};
+
+const STATUS_ORDER: BucketStatus[] = ["done", "soon", "want"];
+
+const STATUS_META: Record<BucketStatus, StatusMeta> = {
   done: {
     label: "Done",
     accent: "#2d9c6e",
     background: "#eaf8ef",
     border: "#a9d9b8",
+    marker: "✓",
   },
   soon: {
     label: "In Progress",
     accent: "#c95ca7",
     background: "#f7e3f3",
     border: "#d9afd0",
+    marker: "♥",
   },
   want: {
     label: "To Do",
     accent: "#d7d7d7",
     background: "#f5f5f5",
     border: "#d9d9d9",
+    marker: "•",
   },
 };
 
-const initialItems: BucketItem[] = [
+const INITIAL_ITEMS: BucketItem[] = [
   { id: 1, text: "ファンデ買う", status: "done" },
   { id: 2, text: "資格の勉強を終える", status: "done" },
   { id: 3, text: "部屋を片付ける", status: "done" },
@@ -46,18 +56,29 @@ const initialItems: BucketItem[] = [
   { id: 8, text: "スカイダイビングする", status: "want" },
 ];
 
-const statusOrder: BucketStatus[] = ["done", "soon", "want"];
+const ITEM_SELECTOR = ".bucket-item-wrapper";
+const SECTION_SELECTOR = ".bucket-section";
+
+function getDropEffect(event: React.DragEvent) {
+  event.preventDefault();
+
+  try {
+    event.dataTransfer.dropEffect = "move";
+  } catch {
+    // Some browsers expose a read-only dataTransfer object.
+  }
+}
 
 function App() {
-  const [items, setItems] = useState<BucketItem[]>(initialItems);
-  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [items, setItems] = useState<BucketItem[]>(INITIAL_ITEMS);
   const [draft, setDraft] = useState("");
+  const draggedIdRef = useRef<number | null>(null);
 
   const sections = useMemo(
     () =>
-      statusOrder.map((status) => ({
+      STATUS_ORDER.map((status) => ({
         status,
-        meta: statusMeta[status],
+        meta: STATUS_META[status],
         items: items.filter((item) => item.status === status),
       })),
     [items],
@@ -69,38 +90,39 @@ function App() {
     targetId?: number,
   ) => {
     setItems((current) => {
-      const sourceIndex = current.findIndex((item) => item.id === itemId);
-      if (sourceIndex === -1) return current;
+      const source = current.find((item) => item.id === itemId);
+      if (!source) return current;
 
-      const moved = { ...current[sourceIndex], status: nextStatus };
-      const withoutSource = current.filter((item) => item.id !== itemId);
+      const movedItem = { ...source, status: nextStatus };
+      const remainingItems = current.filter((item) => item.id !== itemId);
 
       if (targetId === undefined) {
-        return [...withoutSource, moved];
+        return [...remainingItems, movedItem];
       }
 
-      const targetIndex = withoutSource.findIndex(
+      const targetIndex = remainingItems.findIndex(
         (item) => item.id === targetId,
       );
+
       if (targetIndex === -1) {
-        return [...withoutSource, moved];
+        return [...remainingItems, movedItem];
       }
 
-      const nextItems = [...withoutSource];
-      nextItems.splice(targetIndex, 0, moved);
+      const nextItems = [...remainingItems];
+      nextItems.splice(targetIndex, 0, movedItem);
       return nextItems;
     });
   };
 
-  const handleAddItem = () => {
-    const value = draft.trim();
-    if (!value) return;
+  const addItem = () => {
+    const text = draft.trim();
+    if (!text) return;
 
     setItems((current) => [
       ...current,
       {
         id: Date.now(),
-        text: value,
+        text,
         status: "want",
       },
     ]);
@@ -111,39 +133,152 @@ function App() {
     setItems((current) => current.filter((item) => item.id !== itemId));
   };
 
+  const clearDraggedItem = () => {
+    draggedIdRef.current = null;
+  };
+
+  const getDraggedId = (dataTransfer?: DataTransfer | null) => {
+    try {
+      const transferredId = Number(dataTransfer?.getData("text/plain"));
+      if (Number.isSafeInteger(transferredId) && transferredId > 0) {
+        return transferredId;
+      }
+    } catch {
+      // Fall back to the ref when dataTransfer is unavailable.
+    }
+
+    return draggedIdRef.current;
+  };
+
+  const dropAtPoint = (x: number, y: number) => {
+    const draggedId = draggedIdRef.current;
+    if (draggedId === null) return;
+
+    const element = document.elementFromPoint(x, y) as HTMLElement | null;
+    if (!element) return;
+
+    const itemElement = element.closest(ITEM_SELECTOR) as HTMLElement | null;
+    if (itemElement) {
+      const targetId = Number(itemElement.dataset.itemId);
+      if (!Number.isSafeInteger(targetId) || targetId === draggedId) return;
+
+      const targetItem = items.find((item) => item.id === targetId);
+      if (targetItem) {
+        moveItem(draggedId, targetItem.status, targetId);
+      }
+      return;
+    }
+
+    const sectionElement = element.closest(
+      SECTION_SELECTOR,
+    ) as HTMLElement | null;
+    const status = sectionElement?.dataset.status as BucketStatus | undefined;
+
+    if (status && STATUS_ORDER.includes(status)) {
+      moveItem(draggedId, status);
+    }
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const touch = event.changedTouches[0];
+    dropAtPoint(touch.clientX, touch.clientY);
+    clearDraggedItem();
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse") return;
+
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Pointer may already have been released.
+    }
+
+    dropAtPoint(event.clientX, event.clientY);
+    clearDraggedItem();
+  };
+
+  const handleSectionDrop = (
+    event: React.DragEvent<HTMLElement>,
+    status: BucketStatus,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const draggedId = getDraggedId(event.dataTransfer);
+    if (draggedId !== null) {
+      moveItem(draggedId, status);
+    }
+
+    clearDraggedItem();
+  };
+
+  const handleItemDrop = (
+    event: React.DragEvent<HTMLDivElement>,
+    targetItem: BucketItem,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const draggedId = getDraggedId(event.dataTransfer);
+    if (draggedId !== null && draggedId !== targetItem.id) {
+      moveItem(draggedId, targetItem.status, targetItem.id);
+    }
+
+    clearDraggedItem();
+  };
+
   const renderItem = (item: BucketItem) => (
     <div
       key={item.id}
       className="bucket-item-wrapper"
+      data-item-id={item.id}
       draggable
-      onDragStart={(event: React.DragEvent<HTMLDivElement>) => {
-        event.dataTransfer!.effectAllowed = "move";
-        setDraggedId(item.id);
-      }}
-      onDragEnd={() => setDraggedId(null)}
-      onDragOver={(event: React.DragEvent<HTMLDivElement>) => {
-        event.preventDefault();
-        event.dataTransfer!.dropEffect = "move";
-      }}
-      onDrop={(event: React.DragEvent<HTMLDivElement>) => {
-        event.preventDefault();
+      onTouchStart={(event) => {
         event.stopPropagation();
-
-        if (draggedId !== null && draggedId !== item.id) {
-          moveItem(draggedId, item.status, item.id);
-        }
+        draggedIdRef.current = item.id;
       }}
+      onTouchEnd={handleTouchEnd}
+      onPointerDown={(event) => {
+        if (event.pointerType === "mouse") return;
+
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Pointer capture is not supported by every browser/device.
+        }
+
+        event.stopPropagation();
+        draggedIdRef.current = item.id;
+      }}
+      onPointerUp={handlePointerUp}
+      onDragStart={(event) => {
+        try {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", String(item.id));
+        } catch {
+          // Fall back to draggedIdRef.
+        }
+
+        draggedIdRef.current = item.id;
+      }}
+      onDragEnd={clearDraggedItem}
+      onDragOver={getDropEffect}
+      onDrop={(event) => handleItemDrop(event, item)}
     >
       <div className={`bucket-item bucket-item--${item.status}`}>
         <span className="bucket-item__handle" aria-label="ドラッグして並び替え">
           ⋮⋮
         </span>
+
         <span
           className={`bucket-item__marker bucket-item__marker--${item.status}`}
         >
-          {item.status === "done" ? "✓" : item.status === "soon" ? "♥" : "•"}
+          {STATUS_META[item.status].marker}
         </span>
+
         <span className="bucket-item__text">{item.text}</span>
+
         <button
           type="button"
           className="bucket-item__delete"
@@ -165,22 +300,16 @@ function App() {
               <section
                 key={status}
                 className="bucket-section"
-                style={{
-                  ["--section-accent" as string]: meta.accent,
-                  ["--section-bg" as string]: meta.background,
-                  ["--section-border" as string]: meta.border,
-                }}
-                onDragOver={(event: React.DragEvent<HTMLElement>) => {
-                  event.preventDefault();
-                  event.dataTransfer!.dropEffect = "move";
-                }}
-                onDrop={(event: React.DragEvent<HTMLElement>) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (draggedId !== null) {
-                    moveItem(draggedId, status);
-                  }
-                }}
+                data-status={status}
+                style={
+                  {
+                    "--section-accent": meta.accent,
+                    "--section-bg": meta.background,
+                    "--section-border": meta.border,
+                  } as React.CSSProperties
+                }
+                onDragOver={getDropEffect}
+                onDrop={(event) => handleSectionDrop(event, status)}
               >
                 <div className="bucket-section__header">{meta.label}</div>
 
@@ -200,13 +329,12 @@ function App() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  handleAddItem();
-                }
+                if (event.key === "Enter") addItem();
               }}
               placeholder="Add a new task"
               aria-label="Add a new task"
             />
+
             <Button
               variant="contained"
               size="small"
@@ -218,7 +346,7 @@ function App() {
                   backgroundColor: "#9ca3a9",
                 },
               }}
-              onClick={handleAddItem}
+              onClick={addItem}
             >
               Add
             </Button>

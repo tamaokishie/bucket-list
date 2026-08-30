@@ -93,6 +93,7 @@ input {
   background: #ffffff;
   cursor: grab;
   user-select: none;
+  touch-action: none;
 }
 
 .bucket-item:active {
