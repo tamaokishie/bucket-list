@@ -96,7 +96,7 @@ input {
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: pan-y;
+  touch-action: auto;
   transition:
     box-shadow 140ms ease,
     transform 140ms ease,

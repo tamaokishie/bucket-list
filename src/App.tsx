@@ -4,7 +4,7 @@ import Button from "@mui/material/Button";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   closestCenter,
   useDroppable,
@@ -106,18 +106,19 @@ function App() {
   });
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 300,
-        tolerance: 10,
-      },
-    }),
-  );
+  useSensor(MouseSensor, {
+    activationConstraint: {
+      distance: 5,
+    },
+  }),
+
+  useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 200,
+      tolerance: 6,
+    },
+  }),
+);
 
   const sections = useMemo(
     () =>
