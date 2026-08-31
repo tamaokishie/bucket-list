@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   DndContext,
@@ -66,14 +66,66 @@ const INITIAL_ITEMS: BucketItemData[] = [
 const isBucketStatus = (value: unknown): value is BucketStatus =>
   value === "done" || value === "soon" || value === "want";
 
+type ApiBucketStatus = "TODO" | "IN_PROGRESS" | "DONE";
+
+type ApiBucketItem = {
+  id: number;
+  title: string;
+  status: ApiBucketStatus;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const API_URL = "http://localhost:8080";
+
+const STATUS_TO_API: Record<BucketStatus, ApiBucketStatus> = {
+  done: "DONE",
+  soon: "IN_PROGRESS",
+  want: "TODO",
+};
+
+const API_TO_STATUS: Record<ApiBucketStatus, BucketStatus> = {
+  DONE: "done",
+  IN_PROGRESS: "soon",
+  TODO: "want",
+};
+
+const fromApiItem = (item: ApiBucketItem): BucketItemData => ({
+  id: item.id,
+  text: item.title,
+  status: API_TO_STATUS[item.status],
+});
+
 export default function App() {
-  const [items, setItems] = useState<BucketItemData[]>(INITIAL_ITEMS);
+  const [items, setItems] = useState<BucketItemData[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Record<BucketStatus, boolean>>({
     done: false,
     soon: false,
     want: false,
   });
+
+  useEffect(() => {
+    const loadItems = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/items`);
+
+        if (!response.ok) {
+          throw new Error(`取得に失敗しました: ${response.status}`);
+        }
+
+        const data: ApiBucketItem[] = await response.json();
+
+        setItems(data.map(fromApiItem));
+      } catch (error) {
+        console.error(error);
+        alert("やりたいことリストの取得に失敗しました");
+      }
+    };
+
+    void loadItems();
+  }, []);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -109,28 +161,61 @@ export default function App() {
     }));
   };
 
-  const addItem = (status: BucketStatus, text: string) => {
-    setItems((current) => {
-      const newItem: BucketItemData = {
-        id: Date.now(),
-        text,
-        status,
-      };
+  const addItem = async (status: BucketStatus, text: string) => {
+    const title = text.trim();
 
-      const firstIndex = current.findIndex((item) => item.status === status);
+    if (!title) {
+      return;
+    }
 
-      if (firstIndex === -1) {
-        return [...current, newItem];
+    const sortOrder = items.filter((item) => item.status === status).length;
+
+    try {
+      const response = await fetch("http://localhost:8080/api/items", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          status: STATUS_TO_API[status],
+          sortOrder,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`登録エラー: ${response.status}`);
       }
 
-      const next = [...current];
-      next.splice(firstIndex, 0, newItem);
-      return next;
-    });
-  };
+      const savedItem: ApiBucketItem = await response.json();
 
-  const deleteItem = (itemId: number) => {
-    setItems((current) => current.filter((item) => item.id !== itemId));
+      const newItem: BucketItemData = {
+        id: savedItem.id,
+        text: savedItem.title,
+        status: API_TO_STATUS[savedItem.status],
+      };
+
+      setItems((current) => [...current, newItem]);
+    } catch (error) {
+      console.error(error);
+      alert("アイテムを登録できませんでした");
+    }
+  };
+  const deleteItem = async (itemId: number) => {
+    try {
+      const response = await fetch(`${API_URL}/api/items/${itemId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(`削除エラー: ${response.status}`);
+      }
+
+      setItems((current) => current.filter((item) => item.id !== itemId));
+    } catch (error) {
+      console.error(error);
+      alert("アイテムを削除できませんでした");
+    }
   };
 
   const handleDragStart = ({ active }: DragStartEvent) => {
@@ -159,9 +244,7 @@ export default function App() {
         overData?.type === "empty-section" &&
         isBucketStatus(overData.status)
       ) {
-        const withoutDragged = current.filter(
-          (item) => item.id !== active.id,
-        );
+        const withoutDragged = current.filter((item) => item.id !== active.id);
 
         return [
           ...withoutDragged,
